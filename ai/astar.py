@@ -15,15 +15,16 @@ class GameArena(object):
     def __init__(self, size_x, size_y, seed, difficulty):
         self._size_x = size_x
         self._size_y = size_y
-        self._max_weight = difficulty*1000.0
+        self._max_weight = difficulty
         rnd = random.Random(seed)
         self._area = numpy.zeros((size_x, size_y), numpy.float)
         for x in range(0, size_x):
             for y in range(0, size_y):
-                self._area[x, y] = rnd.randint(0, self._max_weight) \
+                self._area[x, y] = rnd.randint(1, self._max_weight) \
                     #(1000.0 if x == y else
                     #                0.0 if rnd.randint(0, difficulty)
                     #                else 1.0 if rnd.randint(0, difficulty) else 1000.0)
+        print(self._area)
 
     def get_color(self, x, y):
         '''Create a color for a single field'''
@@ -36,16 +37,17 @@ class GameArena(object):
                 color = "green" if self._area[x,y] < 1.0 else "brown" if self._area[x,y] < 100.0 else "black"
                 w.create_rectangle(x * delta, y * delta, (x + 1) * delta, (y + 1) * delta, fill=self.get_color(x,y))
 
-    def draw_astar(self, windows):
+    def draw_astar(self, windows, the_color, distance_func = None):
         delta = 20
-        a_star_path = self.astar((0,0), (self._size_x-1, self._size_y-1))
+        a_star_path = self.astar((0,0), (self._size_x-1, self._size_y-1), distance_func = distance_func)
         for (x, y) in a_star_path:
-            w.create_oval(x * delta+delta/3, y * delta + delta/3, x * delta+2*(delta/3), y * delta + 2*(delta/3), fill="red")
+            w.create_oval(x * delta+delta/3, y * delta + delta/3, x * delta+2*(delta/3), y * delta + 2*(delta/3), fill=the_color)
         print("A*: %s" % self.astar((0,0), (self._size_x-1, self._size_y-1)))
 
-    def astar(self, start_point, end_point):
 
-        def distance(p1, p2):
+    def astar(self, start_point, end_point, distance_func = None):
+
+        def manhattan_distance(p1, p2):
             (x1, y1) = p1
             (x2, y2) = p2
             return abs(x1-x2) + abs(y1-y2)
@@ -62,28 +64,24 @@ class GameArena(object):
             (x, y) = point
             if x > 0:
                 yield (x-1, y)
-                if y > 0:
-                    yield (x-1, y-1)
-                if y < self._size_y-1:
-                    yield (x-1, y+1)
             if x < self._size_x-1:
                 yield (x+1, y)
-                if y > 0:
-                    yield (x+1, y-1)
-                if y < self._size_y-1:
-                    yield (x+1, y+1)
             if y > 0:
                 yield (x, y-1)
             if y < self._size_y-1:
                 yield (x, y+1)
 
+        if distance_func is None:
+            distance_func = manhattan_distance
 
         closed_elements = set()
         pred = {}
 
         g_score = numpy.full([self._size_x, self._size_y], 9999999.9)
         f_score = numpy.full([self._size_x, self._size_y], 9999999.9)
-        (start_x, start_y) = start_point
+        g_score[0, 0] = 0.0
+        f_score[0, 0] = 0.0
+        open_elements = set([start_point])
 
         def get_element_with_minimal_f():
             min_value = None
@@ -94,9 +92,7 @@ class GameArena(object):
                     min_element = (x,y)
             return min_element
 
-        open_elements = set([start_point])
-        g_score[0, 0] = 0.0
-        f_score[0, 0] = 0.0
+
         while any(open_elements):
             current = get_element_with_minimal_f()
             open_elements.remove(current)
@@ -123,7 +119,7 @@ class GameArena(object):
 
                 pred[neighbor] = current
                 g_score[nx, ny] = g_candidate
-                f_score[nx, ny] = g_score[nx, ny] + distance(neighbor, end_point)
+                f_score[nx, ny] = g_score[nx, ny] + distance_func(neighbor, end_point)
 
 
 
@@ -141,9 +137,9 @@ w = tkinter.Canvas(master,
            height=canvas_height)
 w.pack()
 
-g = GameArena(30, 30, 14552, 5)
+g = GameArena(30, 30, 1, 5.00)
 g.draw(w)
-g.draw_astar(w)
-
+g.draw_astar(w, "blue") # default heuristic: Manhattan distance
+g.draw_astar(w, "red", distance_func=lambda p1, p2: 0.0) # Dijkstra
 
 tkinter.mainloop()
